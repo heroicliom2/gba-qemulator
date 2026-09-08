@@ -1,0 +1,4 @@
+[submodule "qemu"]
+	path = qemu
+	url = https://github.com/heroicliom2/gba-qemu.git
+	branch = gba-machine
