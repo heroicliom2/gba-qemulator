@@ -2,7 +2,7 @@
 
 Update this file at the end of every phase. This is the resumability mechanism for future sessions/agents — read this first when picking the project back up.
 
-## Status: Phase 1 complete, ready to start Phase 2
+## Status: Phase 2 complete, ready to start Phase 3
 
 - [x] WSL2 Ubuntu 22.04 toolchain installed: git, gcc, ninja, pkg-config, meson (user-local at `~/.local/bin`), libglib2.0-dev, libpixman-1-dev, libfdt-dev, zlib1g-dev, libslirp-dev, libcap-ng-dev, libattr1-dev, python3-pip.
 - [x] QEMU cloned (shallow, `--depth 1` from `https://gitlab.com/qemu-project/qemu.git`) into `c:\Users\Musa\Documents\gameboy\qemu`, branch `gba-machine` created off `origin/master` (commit `35500e5c41` at clone time).
@@ -15,8 +15,11 @@ Update this file at the end of every phase. This is the resumability mechanism f
   - Committed on `gba-machine` branch: `66fcfbf1ef` "target/arm: add arm7tdmi CPU type for GBA machine support". WSL git identity was unset and had to be configured to match the Windows-side identity (`heroiclion2` / `heroiclion2@gmail.com`) before committing — see `SETUP.md`.
   - Pushed to GitHub: created `https://github.com/heroicliom2/gba-qemu` (public), unshallowed the clone (full upstream QEMU history, `git fetch --unshallow origin` — a shallow clone can't be pushed cleanly to a fresh repo), then pushed the `gba-machine` branch there. `origin` remains upstream `qemu-project/qemu` on GitLab (read-only reference, never push there); `github` remote added pointing at `https://github.com/heroicliom2/gba-qemu.git` for this fork. See `SETUP.md` for the credential-bridging steps used (WSL has no `gh` installed, so a token was bridged from the Windows-side authenticated `gh` CLI for the one-time push).
 - [x] **Two-repo GitHub structure set up**: top-level project repo `https://github.com/heroicliom2/gba-qemulator` (branch `main`, contains this `docs/` folder, the top `README.md`, and `qemu/` linked in as a **git submodule** — not duplicated — pointing at `https://github.com/heroicliom2/gba-qemu` branch `gba-machine`) plus the QEMU fork itself `https://github.com/heroicliom2/gba-qemu` (has its own short `README.md` under `qemu/`). Cloning the project going forward: `git clone --recurse-submodules https://github.com/heroicliom2/gba-qemulator.git`. Both repos have a `github` remote (clean, no embedded token) alongside `qemu`'s `origin` (upstream QEMU, read-only).
-- [ ] Phase 2 — Machine skeleton (`hw/arm/gba.c`, Kconfig, meson.build) — **next up**
-- [ ] Phase 3 — Interrupt controller + keypad
+- [x] **Phase 2 — Machine skeleton** (`hw/arm/gba.c`, new; `hw/arm/Kconfig` + `hw/arm/meson.build` updated). `gba_init()` creates the `arm7tdmi` CPU (`object_new`/`qdev_realize`, no Linux boot protocol — ARM resets PC=0 architecturally, matching real GBA/BIOS boot), maps EWRAM (256KiB @ `0x02000000`) and IWRAM (32KiB @ `0x03000000`) as plain RAM, maps BIOS (16KiB @ `0x00000000`, from `-bios`, **required** — errors out if missing) and cart ROM (sized to the loaded file, @ `0x08000000`, from `-kernel`, optional, mirrored via `memory_region_init_alias` at `0x0A000000`/`0x0C000000` for the wait-state-1/2 windows) as ROM. `mc->ignore_memory_transaction_failures = true` so BIOS code touching not-yet-implemented I/O/VRAM/palette/OAM (Phases 3-8) reads/writes open bus instead of aborting. `mc->valid_cpu_types` restricted to `arm7tdmi` only.
+  - Built clean (`ninja qemu-system-arm`, `hw_arm_gba.c.o` compiled with no warnings/errors).
+  - Verified: `-M help` lists `gba`; booting without `-bios` prints the expected error and exits 1; booting with a minimal hand-crafted 16KiB BIOS (a single `B .` infinite-loop opcode at offset 0) puts the CPU at `PC=0x00000000`, mode `svc32` (correct ARM reset state) and it sits there looping, confirming BIOS ROM is loaded and executing correctly; monitor `xp` reads at `0x08000000`/`0x0A000000`/`0x0C000000` (cart + mirrors) and `0x02000000`/`0x03000000` (EWRAM/IWRAM) all succeed with no bus-access errors, confirming every region from the memory map table is mapped.
+  - Not yet committed/pushed — see next session.
+- [ ] Phase 3 — Interrupt controller + keypad — **next up**
 - [ ] Phase 4 — Timers
 - [ ] Phase 5 — DMA controller
 - [ ] Phase 6 — PPU/display controller
