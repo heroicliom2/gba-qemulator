@@ -2,7 +2,7 @@
 
 Update this file at the end of every phase. This is the resumability mechanism for future sessions/agents — read this first when picking the project back up.
 
-## Status: Phase 2 complete, ready to start Phase 3
+## Status: Phase 3 complete, ready to start Phase 4
 
 - [x] WSL2 Ubuntu 22.04 toolchain installed: git, gcc, ninja, pkg-config, meson (user-local at `~/.local/bin`), libglib2.0-dev, libpixman-1-dev, libfdt-dev, zlib1g-dev, libslirp-dev, libcap-ng-dev, libattr1-dev, python3-pip.
 - [x] QEMU cloned (shallow, `--depth 1` from `https://gitlab.com/qemu-project/qemu.git`) into `c:\Users\Musa\Documents\gameboy\qemu`, branch `gba-machine` created off `origin/master` (commit `35500e5c41` at clone time).
@@ -19,8 +19,10 @@ Update this file at the end of every phase. This is the resumability mechanism f
   - Built clean (`ninja qemu-system-arm`, `hw_arm_gba.c.o` compiled with no warnings/errors).
   - Verified: `-M help` lists `gba`; booting without `-bios` prints the expected error and exits 1; booting with a minimal hand-crafted 16KiB BIOS (a single `B .` infinite-loop opcode at offset 0) puts the CPU at `PC=0x00000000`, mode `svc32` (correct ARM reset state) and it sits there looping, confirming BIOS ROM is loaded and executing correctly; monitor `xp` reads at `0x08000000`/`0x0A000000`/`0x0C000000` (cart + mirrors) and `0x02000000`/`0x03000000` (EWRAM/IWRAM) all succeed with no bus-access errors, confirming every region from the memory map table is mapped.
   - Not yet committed/pushed — see next session.
-- [ ] Phase 3 — Interrupt controller + keypad — **next up**
-- [ ] Phase 4 — Timers
+- [x] **Phase 3 — Interrupt controller + keypad**. `hw/intc/gba_intc.c` (+`include/hw/intc/gba_intc.h`): flat IE(0x04000200)/IF(0x04000202)/IME(0x04000208) registers, two `sysbus_init_mmio` regions (IE/IF as one 4-byte region, IME as a second 4-byte region, matching the real address gap where WAITCNT lives in between, left unmapped/unimplemented for now). GPIO-in line per interrupt source (`GBA_IRQ_VBLANK`..`GBA_IRQ_GAMEPAK`, 14 lines) — a rising edge latches the bit in IF (real hardware semantics: IF stays set until software writes 1 to acknowledge, independent of IE); CPU IRQ line asserted whenever `IME & (IE & IF) != 0`. `hw/input/gba_keypad.c` (+`include/hw/input/gba_keypad.h`): KEYINPUT(0x04000130, read-only active-low)/KEYCNT(0x04000132) registers, fixed keyboard mapping (arrows=D-pad, X/Z=A/B, Return/Backspace=Start/Select, A/S=L/R) via `qemu_input_handler_register`, drives `GBA_IRQ_KEYPAD` into the intc when the KEYCNT-selected condition (OR/AND of selected buttons) is met. Wired up in `gba_init()`: intc's output IRQ → CPU's `ARM_CPU_IRQ`, keypad's output IRQ → intc's `GBA_IRQ_KEYPAD` gpio-in.
+  - Build: added `hw/intc/gba_intc.c`/`hw/input/gba_keypad.c` to their `meson.build`s, new `GBA_INTC`/`GBA_KEYPAD` Kconfig bools, `select`ed from the `GBA` machine stanza. Built clean.
+  - Verified with a **hand-assembled ARM test BIOS** (no assembler toolchain available, so instructions were manually encoded byte-by-byte and cross-checked via `-d in_asm,cpu` disassembly trace before trusting the result — see `test_bios_phase3.bin` approach, not committed, reproducible from the opcode list in session notes if ever needed again) that writes IE=0x1000 (keypad bit), IME=1, KEYCNT=0x4001 (enable + select button A + OR mode), then loops forever. Monitor `xp` reads after boot confirmed all three registers held the written values; `sendkey x` (mapped to GBA button A) then caused IF to read back `0x1000` (bit 12, keypad) — confirming the full keypad→intc→IF chain works correctly end-to-end.
+- [ ] Phase 4 — Timers — **next up**
 - [ ] Phase 5 — DMA controller
 - [ ] Phase 6 — PPU/display controller
 - [ ] Phase 7 — Audio (APU)
